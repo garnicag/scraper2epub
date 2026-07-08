@@ -1,0 +1,76 @@
+name: Generar EPUBs y publicar OPDS
+
+on:
+  # Ejecución programada (UTC). Ejemplo: todos los días a las 06:00 UTC.
+  schedule:
+    - cron: "0 6 * * *"
+  # Permite lanzarlo a mano desde la pestaña Actions.
+  workflow_dispatch:
+  # Regenera también al hacer push a los scripts (opcional).
+  push:
+    branches: [main]
+    paths:
+      - "*.py"
+      - "requirements.txt"
+      - ".github/workflows/build.yml"
+
+# Permisos que necesita el despliegue en GitHub Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Evita despliegues solapados.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Generar los EPUBs
+        # Añade o quita scripts en esta lista según los que tengas.
+        env:
+          SCRIPTS: "elotrolado.py eltiempo-bogota.py eltiempo-deportes.py gbatemp.py"
+        run: |
+          mkdir -p public/books
+          for script in $SCRIPTS; do
+            echo "==> Ejecutando $script"
+            python "$script" || echo "AVISO: $script falló, se omite"
+          done
+          # Mueve todos los .epub generados en la raíz a public/books/
+          mv *.epub public/books/ 2>/dev/null || true
+          echo "EPUBs generados:"
+          ls -la public/books/ || true
+
+      - name: Construir el catálogo OPDS
+        run: python build_opds.py
+
+      - name: Subir artefacto para Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Desplegar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
