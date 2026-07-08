@@ -1,9 +1,12 @@
 name: Generar EPUBs y publicar OPDS
 
 on:
-  # Ejecución programada (UTC). Ejemplo: todos los días a las 06:00 UTC.
+  # Ejecución programada (UTC). 
+  # 0 11 * * *  --> a las 11:00 UTC de la mañana
+  # 0 22 * * *  --> a las 22:00 UTC de la noche
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 11 * * *"
+    - cron: "0 22 * * *"
   # Permite lanzarlo a mano desde la pestaña Actions.
   workflow_dispatch:
   # Regenera también al hacer push a los scripts (opcional).
