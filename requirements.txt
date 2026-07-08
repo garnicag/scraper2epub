@@ -1,0 +1,10 @@
+# Dependencias comunes a ambos scrapers (scraper_epub.py y eltiempo_epub.py)
+requests==2.33.1
+beautifulsoup4==4.14.3
+lxml==6.0.2
+ebooklib==0.20.0
+ 
+# Solo las usa eltiempo_epub.py
+feedparser==6.0.12
+readability-lxml==0.8.4.1
+ 
