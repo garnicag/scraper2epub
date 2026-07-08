@@ -1,5 +1,6 @@
 import io
 import os
+import time
 import uuid
 import mimetypes
 from datetime import datetime
@@ -7,6 +8,15 @@ from urllib.parse import urljoin, urlparse
 from xml.sax.saxutils import escape
 
 import requests
+
+# GBAtemp está tras Cloudflare, que bloquea a requests por su huella TLS.
+# curl_cffi imita la huella de un navegador real y evita el 403.
+try:
+    from curl_cffi import requests as _http
+    _IMPERSONATE = "chrome"
+except ImportError:
+    _http = requests
+    _IMPERSONATE = None
 import lxml.etree as ET
 from bs4 import BeautifulSoup
 from ebooklib import epub
@@ -14,6 +24,9 @@ from ebooklib import epub
 # URL del feed RSS
 RSS_URL = "https://gbatemp.net/official/index.rss"
 OUTPUT_EPUB = "gbatemp.epub"
+
+# Número máximo de artículos a incluir (los primeros del RSS)
+MAX_ARTICLES = 15
 
 # Muchos sitios bloquean el User-Agent por defecto de requests
 HEADERS = {
@@ -41,9 +54,27 @@ CHAPTER_TMPL = """<h2>{title}</h2>
 <p class="source"><a href="{link}">Fuente original</a></p>"""
 
 
+def fetch(url, timeout=20, retries=3):
+    """Descarga una URL imitando a un navegador (curl_cffi) para sortear
+    la protección de Cloudflare. Reintenta con una pequeña espera."""
+    last_exc = None
+    for intento in range(1, retries + 1):
+        try:
+            if _IMPERSONATE:
+                resp = _http.get(url, impersonate=_IMPERSONATE, timeout=timeout)
+            else:
+                resp = _http.get(url, headers=HEADERS, timeout=timeout)
+            resp.raise_for_status()
+            return resp
+        except Exception as e:
+            last_exc = e
+            if intento < retries:
+                time.sleep(2 * intento)  # backoff: 2s, 4s...
+    raise last_exc
+
+
 def parse_rss(url):
-    resp = requests.get(url, headers=HEADERS, timeout=10)
-    resp.raise_for_status()
+    resp = fetch(url)
 
     tree = ET.parse(io.BytesIO(resp.content))
     root = tree.getroot()
@@ -63,8 +94,7 @@ def scrape_article_body(url):
     """GBAtemp usa XenForo: el artículo es el primer mensaje del hilo,
     cuyo contenido está en article.message -> .bbWrapper."""
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=10)
-        resp.raise_for_status()
+        resp = fetch(url)
         soup = BeautifulSoup(resp.text, "html.parser")
 
         # Primer mensaje del hilo (el post original = la noticia)
@@ -119,8 +149,7 @@ def embed_images(html, base_url, book, counter):
 
         abs_url = urljoin(base_url, src)
         try:
-            r = requests.get(abs_url, headers=HEADERS, timeout=10)
-            r.raise_for_status()
+            r = fetch(abs_url)
             ctype = r.headers.get("Content-Type", "").split(";")[0].strip()
             ext = (mimetypes.guess_extension(ctype)
                    or os.path.splitext(urlparse(abs_url).path)[1]
@@ -200,7 +229,7 @@ def generate_epub(items):
 
 
 def main():
-    items = parse_rss(RSS_URL)
+    items = parse_rss(RSS_URL)[:MAX_ARTICLES]
     print(f"Procesando feed: {RSS_URL}")
     print(f"Entradas encontradas: {len(items)}\n")
     generate_epub(items)

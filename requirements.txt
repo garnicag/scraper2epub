@@ -7,4 +7,6 @@ ebooklib==0.20.0
 # Solo las usa eltiempo_epub.py
 feedparser==6.0.12
 readability-lxml==0.8.4.1
- 
+
+# Necesaria para gbatemp_epub.py (evita el bloqueo Cloudflare por huella TLS)
+curl_cffi==0.15.0
