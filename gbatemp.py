@@ -22,11 +22,12 @@ from bs4 import BeautifulSoup
 from ebooklib import epub
 
 # URL del feed RSS
-RSS_URL = "https://gbatemp.net/official/index.rss"
-OUTPUT_EPUB = "gbatemp.epub"
+# RSS_URL = "https://gbatemp.net/official/index.rss"
+RSS_URL = "https://rss.app/feeds/1MojdSGaXWYAAf2d.xml"
+OUTPUT_EPUB = "gbatemp2.epub"
 
 # Número máximo de artículos a incluir (los primeros del RSS)
-MAX_ARTICLES = 15
+MAX_ARTICLES = 25
 
 # Muchos sitios bloquean el User-Agent por defecto de requests
 HEADERS = {
